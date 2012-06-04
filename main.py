@@ -3,13 +3,16 @@
 from itertools import imap, chain
 import errno
 import fuse
+import logging
 import os
 import re
 import stat
-from warnings import warn
 
 from dulwich.repo import Repo
 from dulwich.errors import NotGitRepository
+
+log = logging.getLogger()
+logging.basicConfig()
 
 fuse.fuse_python_api = (0, 2)
 
@@ -170,7 +173,7 @@ class RepoNode(DirNode):
             try:
                 ref_sha = self.repo.refs[ref_name]
             except KeyError:
-                warn('%r not found in %r' % (ref_name, self.repo))
+                log.warn('%r not found in %r' % (ref_name, self.repo))
             else:
                 ref_node = GitRefNode(components[-1], self, ref_sha)
                 self.attach_child(ref_node, components[:-1])
@@ -198,7 +201,6 @@ class RepoNode(DirNode):
                 if not handler:
                     return None  # does not exist
 
-                print 'second try handler', handler
                 return handler.create_offset_node(offset)
 
         return rv
@@ -368,12 +370,14 @@ class LegitFS(fuse.Fuse):
         self.parser.add_option(mountopt='root', metavar='ROOT', default='./',
                                help='Top-level dir to search for git '\
                                     'repositories')
+        self.parser.add_option(mountopt='verbose', help='Output more stuff',
+                               default=False, action='store_true')
 
     def __getattr__(self, name):
         def _(path, *args, **kwargs):
             endpoint = self.root.find_handler(path)
-            print "called %s(%r, %r, %r), endpoint %s" % (
-                name, path, args, kwargs, endpoint)
+            log.debug("called %s(%r, %r, %r), endpoint %s" % (
+                name, path, args, kwargs, endpoint))
             if not endpoint:
                 return -errno.ENOENT
             func = getattr(endpoint, 'fuse_' + name, None)
@@ -385,7 +389,9 @@ class LegitFS(fuse.Fuse):
         return _
 
     def main(self):
-        print "Collecting underpants..."
+        log.info('Collecting underpants...')
+        log.setLevel(logging.DEBUG if self.cmdline[0].verbose else
+        logging.WARNING)
         root = os.path.abspath(self.cmdline[0].root)
 
         def make_node(path, relpath):
@@ -416,9 +422,10 @@ class LegitFS(fuse.Fuse):
                 if parent.leaf:
                     queue.append(parent)
 
-        print root_node.dumps()
+        log.debug(root_node.dumps())
 
         self.root = root_node
+        log.info('Running')
         return super(LegitFS, self).main()
 
 
