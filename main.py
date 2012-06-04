@@ -15,6 +15,7 @@ fuse.fuse_python_api = (0, 2)
 
 GIT_REL_REF = re.compile(r'(.*?)((?:\^|\~\d+)+)$')
 
+
 class VNode(object):
     primary = False
 
@@ -240,21 +241,21 @@ class GitCommitNode(VirtualDirNode):
 
     def fuse_open(self, path, flags):
         if flags & os.O_APPEND or\
-           flags & os.O_CREAT or\
-           flags & os.O_DIRECTORY or\
-           flags & os.O_EXCL or\
-           flags & os.O_LARGEFILE or\
-           flags & os.O_NONBLOCK or\
-           flags & os.O_TRUNC or\
-           flags & os.O_WRONLY or\
-           flags & os.O_RDWR:
-           return -errno.ENOSYS
+            flags & os.O_CREAT or\
+            flags & os.O_DIRECTORY or\
+            flags & os.O_EXCL or\
+            flags & os.O_LARGEFILE or\
+            flags & os.O_NONBLOCK or\
+            flags & os.O_TRUNC or\
+            flags & os.O_WRONLY or\
+            flags & os.O_RDWR:
+            return -errno.ENOSYS
 
         return 0  # always succeed
 
     def fuse_read(self, path, size, offset):
         mode, blob = self._get_object(path)
-        return blob.data[offset:offset+size]  # FIXME: this is horrible
+        return blob.data[offset:offset + size]  # FIXME: this is horrible
 
     def fuse_readdir(self, path, offset):
         for de in super(GitCommitNode, self).fuse_readdir(path, offset):
@@ -329,7 +330,6 @@ class GitRefNode(FileNode):
     def fuse_readlink(self, path):
         return os.path.relpath(self.repo_node.get_commit_path(self.sha),
                                self.parent.path)
-
 
     def create_offset_node(self, offset):
         offset_node = self.__class__(self.name, self.repo_node, self.sha)
