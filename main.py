@@ -254,8 +254,23 @@ class GitCommitNode(VirtualDirNode):
         return 0  # always succeed
 
     @property
+    def commit(self):
+        if not hasattr(self, '_commit'):
+            self._load()
+
+        return self._commit
+
+    @property
     def tree(self):
-        return self.repo[self.repo[self.commit_sha].tree]
+        if not hasattr(self, '_tree'):
+            self._load()
+
+        return self._tree
+
+    def _load(self):
+        if not hasattr(self, 'commit'):
+            self._commit = self.repo[self.commit_sha]
+            self._tree = self.repo[self.commit.tree]
 
     def _get_object(self, path):
         rel_path = self._get_rel_path(path)
