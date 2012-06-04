@@ -31,6 +31,17 @@ class VNode(object):
         self.children[child.name] = child
         child.parent = self
 
+    def attach_child(self, child, path):
+        cur = self
+        while path:
+            sub_name = path.pop(0)
+            if not sub_name in cur.children:
+                cur.add_child(DirNode(sub_name))
+
+            cur = cur.children[sub_name]
+
+        cur.add_child(child)
+
     def ancestors(self):
         node = self.parent
         while node:
@@ -131,6 +142,10 @@ class DirNode(VNode):
         return 0
 
 
+class FileNode(VNode):
+    pass
+
+
 class VirtualDirNode(DirNode):
     def _find_handler(self, path_comp):
         me = path_comp.pop(0)
@@ -147,20 +162,43 @@ class RepoNode(DirNode):
     def __init__(self, name, repo_path):
         super(RepoNode, self).__init__(name)
         self.repo = Repo(repo_path)
-        self.add_child(GitRefNode('HEAD', 'HEAD'))
+
+        # also add refs
+        for ref_name in self.repo.refs.allkeys():
+            components = ref_name.split('/')
+            try:
+                ref_sha = self.repo.refs[ref_name]
+            except KeyError:
+                warn('%r not found in %r' % (ref_name, self.repo))
+            else:
+                ref_node = GitRefNode(components[-1],
+                                      self.repo,
+                                      ref_sha,
+                                      os.path.join(
+                                          self.path, 'commits', ref_sha
+                                      ))
+                self.attach_child(ref_node, components[:-1])
+
+        commits = DirNode('commits')
+        for commit in  filter(lambda obj: obj.type_name == 'commit',
+                             (self.repo[sha] for sha in
+                                             self.repo.object_store)):
+            commits.add_child(GitCommitNode(commit.id, self.repo, commit.id))
+
+        self.add_child(commits)
 
 
-class GitRefNode(VirtualDirNode):
+class GitCommitNode(VirtualDirNode):
     primary = True
 
-    def __init__(self, name, ref):
-        super(GitRefNode, self).__init__(name)
-        self.ref = ref
-
+    def __init__(self, name, repo, commit):
+        super(GitCommitNode, self).__init__(name)
+        self.repo = repo
+        self.commit_sha = commit
 
     def fuse_getattr(self, path):
         if self.path == path:
-            return super(GitRefNode, self).fuse_getattr(path)
+            return super(GitCommitNode, self).fuse_getattr(path)
 
         mode, blob = self._get_object(path)
 
@@ -198,7 +236,7 @@ class GitRefNode(VirtualDirNode):
         return blob.data[offset:offset+size]  # FIXME: this is horrible
 
     def fuse_readdir(self, path, offset):
-        for de in super(GitRefNode, self).fuse_readdir(path, offset):
+        for de in super(GitCommitNode, self).fuse_readdir(path, offset):
             yield de
 
         mode, tree = self._get_object(path)
@@ -214,20 +252,45 @@ class GitRefNode(VirtualDirNode):
 
     @property
     def tree(self):
-        ref = self.parent.repo.refs[self.ref]
-        commit = self.parent.repo[ref]
-        tree = self.parent.repo[commit.tree]
-
-        return tree
+        return self.repo[self.repo[self.commit_sha].tree]
 
     def _get_object(self, path):
         rel_path = self._get_rel_path(path)
         if '.' == rel_path:
             return stat.S_IFDIR | 0755, self.tree  # FIXME: mode?
         mode, sha = self.tree.lookup_path(
-            self.parent.repo.__getitem__, rel_path
+            self.repo.__getitem__, rel_path
         )
-        return mode, self.parent.repo[sha]
+        return mode, self.repo[sha]
+
+
+class GitRefNode(FileNode):
+    primary = True
+
+    def __init__(self, name, repo, sha, target_path):
+        super(GitRefNode, self).__init__(name)
+        self.repo = repo
+        self.sha = sha
+        self.target_path = target_path
+
+    def fuse_getattr(self, path):
+        s = fuse.Stat(
+            st_mode=stat.S_IFLNK | 0777,
+            st_ino=0,
+            st_dev=0,
+            st_nlink=1,
+            st_uid=0,  # FIXME
+            st_gid=0,  # FIXME,
+            st_size=4096,
+            st_atime=0,  # FIXME
+            st_mtime=0,  # FIXME,
+            st_ctime=0,  # FIXME
+        )
+        return s
+
+    def fuse_readlink(self, path):
+        return os.path.relpath(self.target_path, self.parent.path)
+
 
 
 class LegitFS(fuse.Fuse):
@@ -242,8 +305,8 @@ class LegitFS(fuse.Fuse):
     def __getattr__(self, name):
         def _(path, *args, **kwargs):
             endpoint = self.root.find_handler(path)
-            #print "called %s(%r, %r, %r), endpoint %s" % (
-            #    name, path, args, kwargs, endpoint)
+            print "called %s(%r, %r, %r), endpoint %s" % (
+                name, path, args, kwargs, endpoint)
             if not endpoint:
                 return -errno.ENOENT
             func = getattr(endpoint, 'fuse_' + name, None)
