@@ -12,13 +12,6 @@ from dulwich.errors import NotGitRepository
 
 fuse.fuse_python_api = (0, 2)
 
-def dirFromList(list):
-    """
-    Return a properly formatted list of items suitable to a directory listing.
-    [['a', 'b', 'c']] => [[('a', 0), ('b', 0), ('c', 0)]]
-    """
-    return [[(x, 0) for x in list]]
-
 class VNode(object):
     primary = False
 
