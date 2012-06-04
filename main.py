@@ -4,6 +4,7 @@ from itertools import imap, chain
 import errno
 import fuse
 import os
+import re
 import stat
 from warnings import warn
 
@@ -11,6 +12,8 @@ from dulwich.repo import Repo
 from dulwich.errors import NotGitRepository
 
 fuse.fuse_python_api = (0, 2)
+
+GIT_REL_REF = re.compile(r'(.*?)((?:\^|\~\d+)+)$')
 
 class VNode(object):
     primary = False
@@ -40,6 +43,10 @@ class VNode(object):
         while node:
             yield node
             node = node.parent
+
+    def clone_position_from(self, target):
+        self.parent = target.parent
+        self.children = target.children.copy()
 
     def dfs_iter(self):
         stack = [self]
@@ -164,12 +171,7 @@ class RepoNode(DirNode):
             except KeyError:
                 warn('%r not found in %r' % (ref_name, self.repo))
             else:
-                ref_node = GitRefNode(components[-1],
-                                      self.repo,
-                                      ref_sha,
-                                      os.path.join(
-                                          self.path, 'commits', ref_sha
-                                      ))
+                ref_node = GitRefNode(components[-1], self, ref_sha)
                 self.attach_child(ref_node, components[:-1])
 
         commits = DirNode('commits')
@@ -179,6 +181,29 @@ class RepoNode(DirNode):
             commits.add_child(GitCommitNode(commit.id, self.repo, commit.id))
 
         self.add_child(commits)
+
+    def _find_handler(self, path_comp):
+        path_copy = path_comp[:]  # make a copy of path_comp
+        rv = super(RepoNode, self)._find_handler(path_comp)
+
+        if not rv:
+            m = GIT_REL_REF.match(path_copy[-1])
+            if m:
+                path_copy[-1] = m.group(1)
+                offset = m.group(2)
+
+                handler = super(RepoNode, self)._find_handler(path_copy)
+
+                if not handler:
+                    return None  # does not exist
+
+                print 'second try handler', handler
+                return handler.create_offset_node(offset)
+
+        return rv
+
+    def get_commit_path(self, commit_sha):
+        return os.path.join(self.path, 'commits', commit_sha)
 
 
 class GitCommitNode(VirtualDirNode):
@@ -278,11 +303,10 @@ class GitCommitNode(VirtualDirNode):
 class GitRefNode(FileNode):
     primary = True
 
-    def __init__(self, name, repo, sha, target_path):
+    def __init__(self, name, repo_node, sha):
         super(GitRefNode, self).__init__(name)
-        self.repo = repo
+        self.repo_node = repo_node
         self.sha = sha
-        self.target_path = target_path
 
     def fuse_getattr(self, path):
         s = fuse.Stat(
@@ -300,8 +324,37 @@ class GitRefNode(FileNode):
         return s
 
     def fuse_readlink(self, path):
-        return os.path.relpath(self.target_path, self.parent.path)
+        return os.path.relpath(self.repo_node.get_commit_path(self.sha),
+                               self.parent.path)
 
+
+    def create_offset_node(self, offset):
+        offset_node = self.__class__(self.name, self.repo_node, self.sha)
+        offset_node.clone_position_from(self)
+
+        commit = self.repo_node.repo[self.sha]
+
+        cs = iter(offset)
+
+        try:
+            while True:
+                c = cs.next()
+
+                if '^' == c:
+                    val = 1
+                elif '~' == c:
+                    val = int(cs.next())
+
+                for i in xrange(val):
+                    commit = self.repo_node.repo[commit.parents[0]]
+        except StopIteration:
+            pass
+        except IndexError:
+            return None  # we've reached the root
+
+        offset_node.sha = commit.id
+
+        return offset_node
 
 
 class LegitFS(fuse.Fuse):
