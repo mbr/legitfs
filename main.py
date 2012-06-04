@@ -200,7 +200,10 @@ class GitCommitNode(VirtualDirNode):
         if self.path == path:
             return super(GitCommitNode, self).fuse_getattr(path)
 
-        mode, blob = self._get_object(path)
+        try:
+            mode, blob = self._get_object(path)
+        except KeyError:
+            return -errno.ENOENT
 
         s = fuse.Stat(
             st_mode=mode,
