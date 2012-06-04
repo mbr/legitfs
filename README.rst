@@ -18,7 +18,7 @@ distro.
 
 In addition, a somewhat recent version of `dulwich
 <http://www.samba.org/~jelmer/dulwich/>`_ is required. Install it through your
-distro or via `PyPI <http://pypi.python.org/pypi/dulwich/>`_
+distro or via `PyPI <http://pypi.python.org/pypi/dulwich/>`_.
 
 The program itself is just a single file. Download it to anywhere in your path
 and run it.
@@ -60,6 +60,7 @@ just one repository at the root.
 Some more interesting stuff:
 
 ::
+
   $ ls /tmp/legitfs-test/flask/
   commits  HEAD  refs
   $ ls /tmp/legitfs-test/flask/refs/tags -l
