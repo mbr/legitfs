@@ -265,8 +265,11 @@ class GitCommitNode(VirtualDirNode):
         for mode, path, sha in tree.entries():
             yield fuse.Direntry(path)
 
-        # FIXME: symbolic links!
         # "supported": O_NOATIME, O_NOCTTY, O_NOFOLLOW, O_SYNC, O_ASYNC
+
+    def fuse_readlink(self, path):
+        mode, blob = self._get_object(path)
+        return blob.data
 
     def fuse_release(self, path, flags):
         return 0  # always succeed
