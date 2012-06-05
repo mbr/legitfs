@@ -9,8 +9,20 @@ legit is read-only, unless there are catastrophic bugs in the software, it
 should not touch your data in any way.
 
 
-Installation
-------------
+Installation (from PyPI)
+------------------------
+
+Assuming your have `virtualenvwrapper
+<http://www.doughellmann.com/projects/virtualenvwrapper/>`_ installed:
+
+::
+
+  $ mkvirtualenv legitfs
+  $ pip install legitfs
+
+
+Installation (without PyPI)
+---------------------------
 
 legit requires the `FUSE python bindings
 <http://sourceforge.net/apps/mediawiki/fuse/index.php?title=FusePython>`_,
