@@ -15,7 +15,8 @@ Installation
 legit requires the `FUSE python bindings
 <http://sourceforge.net/apps/mediawiki/fuse/index.php?title=FusePython>`_,
 usually these are available (and most often already installed) through your
-distro.
+distro. The correct package on PyPI is named `fuse-python
+<http://pypi.python.org/pypi/fuse-python/>`_.
 
 In addition, a somewhat recent version of `dulwich
 <http://www.samba.org/~jelmer/dulwich/>`_ is required. Install it through your
