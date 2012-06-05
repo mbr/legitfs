@@ -629,7 +629,17 @@ class LegitFS(fuse.Fuse):
     def main(self):
         log.setLevel(logging.DEBUG if self.cmdline[0].verbose else
         logging.WARNING)
-        self.root_path = os.path.abspath(self.cmdline[0].root)
+        self.root_path = os.path.abspath(os.expanduser(self.cmdline[0].root))
+
+        if not os.path.exists(self.root_path):
+            log.critical('%s does not exist' % self.root_path)
+            return None
+
+        if not os.path.isdir(self.root_path):
+            log.critical('%s is not a directory' % self.root_path)
+            return None
+
+        log.debug('root_path = %r' % self.root_path)
 
         try:
             import watchdog
