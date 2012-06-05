@@ -12,7 +12,7 @@ should not touch your data in any way.
 Installation (from PyPI)
 ------------------------
 
-Assuming your have `virtualenvwrapper
+Assuming you have `virtualenvwrapper
 <http://www.doughellmann.com/projects/virtualenvwrapper/>`_ installed:
 
 ::
