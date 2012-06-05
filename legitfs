@@ -388,49 +388,59 @@ class LegitFS(fuse.Fuse):
             return func(path, *args, **kwargs)
         return _
 
+
+    def fsdestroy(self):
+        log.debug('fsdestroy')
+
+
     def main(self):
-        log.info('Collecting underpants...')
         log.setLevel(logging.DEBUG if self.cmdline[0].verbose else
         logging.WARNING)
-        root = os.path.abspath(self.cmdline[0].root)
+        self.root_path = os.path.abspath(self.cmdline[0].root)
+        self.root = rebuild_tree(self.root_path)
 
-        def make_node(path, relpath):
-            try:
-                dnode = RepoNode(relpath, path)
-                return dnode
-            except NotGitRepository:
-                return DirNode(relpath)
-
-        def walk_subtree(path, name):
-            root = make_node(path, name)
-
-            for sub in os.listdir(path):
-                subpath = os.path.join(path, sub)
-                if os.path.isdir(subpath):
-                    root.add_child(walk_subtree(subpath, sub))
-
-            return root
-
-        root_node = walk_subtree(root, '')
-
-        # prune tree
-        queue = [node for node in root_node.dfs_iter() if node.leaf]
-        while queue:
-            node = queue.pop(0)
-            if not node.primary:
-                parent = node.parent.remove_child(node)
-                if parent.leaf:
-                    queue.append(parent)
-
-        log.debug(root_node.dumps())
-
-        self.root = root_node
         log.info('Running')
         return super(LegitFS, self).main()
+
+def make_node(path, relpath):
+    try:
+        dnode = RepoNode(relpath, path)
+        return dnode
+    except NotGitRepository:
+        return DirNode(relpath)
+
+
+def rebuild_tree(build_path):
+    log.info('Collecting underpants...')
+
+    def walk_subtree(path, name):
+        root = make_node(path, name)
+
+        for sub in os.listdir(path):
+            subpath = os.path.join(path, sub)
+            if os.path.isdir(subpath):
+                root.add_child(walk_subtree(subpath, sub))
+
+        return root
+
+    root_node = walk_subtree(build_path, '')
+
+    # prune tree
+    queue = [node for node in root_node.dfs_iter() if node.leaf]
+    while queue:
+        node = queue.pop(0)
+        if not node.primary:
+            parent = node.parent.remove_child(node)
+            if parent.leaf:
+                queue.append(parent)
+
+    log.debug(root_node.dumps())
+
+    return root_node
 
 
 if __name__ == '__main__':
     import sys
-    fs = LegitFS()
+    fs = LegitFS(dash_s_do='setsingle')
     fs.parse(errex=1)
     fs.main()
