@@ -14,7 +14,6 @@ import threading
 from dulwich.repo import Repo
 from dulwich.errors import NotGitRepository
 import fuse
-import gamin
 
 
 log = logging.getLogger('legitfs')
