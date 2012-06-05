@@ -8,6 +8,7 @@ their files through a directory structure.
 legit is read-only, unless there are catastrophic bugs in the software, it
 should not touch your data in any way.
 
+
 Installation
 ------------
 
@@ -22,6 +23,11 @@ distro or via `PyPI <http://pypi.python.org/pypi/dulwich/>`_.
 
 The program itself is just a single file. Download it to anywhere in your path
 and run it.
+
+If you have the `watchdog <http://pypi.python.org/pypi/watchdog>`_ package
+installed, legit will automatically refresh the filesystem-contents when you
+add, update or remove repositories.
+
 
 Usage example
 -------------
@@ -98,19 +104,18 @@ back". While these virtual "files" aren't shown when you ``ls`` the
 ``refs/tags`` directory, you can append any number of ``~n`` or ``^`` to any
 ref to go back commits.
 
+
 What's missing
 --------------
 
-An automatic reload. Haven't gotten around to implementing it yet. You will not
-see new repositories appear, and if you alter refs (using ``--amend``,
-``rebase`` or whatever) they might not show up correctly. This will be fixed
-in a bit.
+* Optimizations for when the tree needs to be rebuilt.
 
-Also Submodules. I currently don't use any and haven't tried them at all.
+* Submodules. I currently don't use any and haven't tried them at all.
 
-Also, each files is read into memory completely (since I haven't been able to
-find a streaming-api for blobs in dulwich yet), so working on large files might
-not be feasible at the moment. Unless you have a lot of RAM.
+* Currently, each file is read into memory completely (since I haven't been
+  able to find a streaming-api for blobs in dulwich yet), so working on large
+  files might not be feasible at the moment. Unless you have a lot of RAM.
+
 
 Is it legit?
 ------------
