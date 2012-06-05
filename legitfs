@@ -668,13 +668,13 @@ class LegitFS(fuse.Fuse):
 
             event_handler = TreeUpdater(self)
 
-            observer = Observer()
-            observer.schedule(
+            self.fs_observer = Observer()
+            self.fs_observer.schedule(
                 event_handler,
                 path=self.root_path,
                 recursive=True
             )
-            observer.start()  # fixme: might need to join thread()
+            self.fs_observer.start()  # fixme: might need to join thread()
 
         log.info('Running')
         return super(LegitFS, self).main()
@@ -683,6 +683,10 @@ class LegitFS(fuse.Fuse):
         log.debug('Tree now dirty')
         with self.write_lock():
             self.clean = False
+
+    def stop_background_threads(self):
+        if hasattr(self, 'fs_observer'):
+            self.fs_observer.stop()
 
     def update_tree(self):
         with self.read_lock():
@@ -737,3 +741,5 @@ if __name__ == '__main__':
     fs = LegitFS(dash_s_do='setsingle')
     fs.parse(errex=1)
     fs.main()
+    log.debug('main exited')
+    fs.stop_background_threads()
