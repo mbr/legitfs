@@ -1,12 +1,11 @@
 leGit-fs
 ========
 
-legit is a `FUSE <http://fuse.sourceforge.net/>`_-filesystem that mounts any
-number of git repositories read only, allowing direct access to all commits and
-their files through a directory structure.
+legit is a `FUSE <http://fuse.sourceforge.net/>`_-filesystem that mount git
+repositories read only, allowing direct access to commits, tags and branches
+through the filesystem.
 
-legit is read-only, unless there are catastrophic bugs in the software, it
-should not touch your data in any way.
+legitfs is read-only and won't eat your data.
 
 
 Installation (from PyPI)
