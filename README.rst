@@ -36,10 +36,6 @@ distro or via `PyPI <http://pypi.python.org/pypi/dulwich/>`_.
 The program itself is just a single file. Download it to anywhere in your path
 and run it.
 
-If you have the `watchdog <http://pypi.python.org/pypi/watchdog>`_ package
-installed, legit will automatically refresh the filesystem-contents when you
-add, update or remove repositories.
-
 
 Usage example
 -------------
