@@ -22,5 +22,5 @@ setup(name='legitfs',
       license='MIT',
       scripts=['legitfs'],
       packages=find_packages(exclude=['tests']),
-      install_requires=['dulwich', 'fuse-python'],
+      install_requires=['dulwich', 'fusepy'],
      )
