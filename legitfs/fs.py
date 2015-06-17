@@ -146,8 +146,7 @@ class RefsNode(RepoMixin, VDirMixin, VNode):
 
 
 class RefNode(RepoMixin, VNode):
-    def resolve_ref(self, refname):
-        return self.repo.refs[refname]
+    REFLINK_PREFIX = 'ref: '
 
     def getattr(self):
         st = self.fs.empty_stat.copy()
@@ -155,7 +154,20 @@ class RefNode(RepoMixin, VNode):
         return st
 
     def readlink(self):
-            return 'objects/' + self.resolve_ref(self.sub)
+        refname = self.sub
+
+        target = self.repo.refs.read_ref(refname)
+
+        if target is None:
+            raise FuseOSError(ENOENT)
+
+        if target.startswith(self.REFLINK_PREFIX):
+            # symbolic ref
+            p = '../' * refname.count('/')
+
+            return p + target[len(self.REFLINK_PREFIX):]
+
+        return 'objects/' + target
 
 
 class FileNode(VNode):
