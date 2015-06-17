@@ -1,4 +1,5 @@
 from errno import ENOENT
+from stat import S_IFLNK
 import os
 
 from fuse import FuseOSError, Operations, LoggingMixIn
@@ -63,19 +64,23 @@ class DirNode(VNode):
         return _stat_to_dict(os.lstat(self.lead))
 
 
-class RepoNode(VNode):
-    PLAIN_FILES = ('config', 'description')
-
+class RepoMixin(object):
     def __init__(self, fs, lead, sub):
-        super(RepoNode, self).__init__(fs, lead, sub)
+        super(RepoMixin, self).__init__(fs, lead, sub)
         try:
             self.repo = Repo(lead)
         except NotGitRepository:
             raise FuseOSError(ENOENT)
 
         self.refs = self.repo.refs.keys()
-        self.ref_dirs = {r.split('/', 2)[1] for r in self.refs
-                         if r.startswith('refs/')}
+
+    def _get_refs(self, prefix='refs/'):
+        return {r[len(prefix):].split('/', 1)[0] for r in self.refs
+                if r.startswith(prefix)}
+
+
+class RepoNode(RepoMixin, VNode):
+    PLAIN_FILES = ('config', 'description')
 
     def getattr(self):
         return _stat_to_dict(os.lstat(self.lead))
@@ -90,7 +95,7 @@ class RepoNode(VNode):
             if os.path.exists(os.path.join(self.lead, fn)):
                 entries.append(fn)
 
-        entries.extend(self.ref_dirs)
+        entries.extend(self._get_refs())
 
         return entries
 
@@ -102,7 +107,30 @@ class RepoNode(VNode):
         if sub in cls.PLAIN_FILES:
             return FileNode(fs, lead, sub)
 
+        if (sub == 'HEAD' or sub == 'stash' or sub.startswith('heads') or
+                sub.startswith('remotes') or sub.startswith('tags')):
+            return RefNode(fs, lead, sub)
+
         raise FuseOSError(ENOENT)
+
+
+class RefNode(RepoMixin, VNode):
+    def resolve_ref(self, refname):
+        return self.repo.refs[refname]
+
+    def getattr(self):
+        st = self.fs.empty_stat.copy()
+        st['st_mode'] |= S_IFLNK
+        return st
+
+    def readlink(self):
+        if self.sub == 'HEAD':
+            return 'objects/' + self.resolve_ref(self.sub)
+
+        if self.sub == 'stash':
+            return 'objects/' + self.resolve_ref('refs/stash')
+
+        return '/what/the/?'
 
 
 class FileNode(VNode):
@@ -119,6 +147,19 @@ class LegitFS(LoggingMixIn, Operations):
     def __init__(self, root, mountpoint):
         self.root = os.path.abspath(root)
         self.mountpoint = os.path.abspath(mountpoint)
+
+        root_stat = os.lstat(root)
+
+        self.empty_stat = {
+            'st_atime': 0,
+            'st_ctime': 0,
+            'st_gid': root_stat.st_gid,
+            'st_mode': 0644,
+            'st_mtime': 0,
+            'st_nlink': 1,
+            'st_size': 0,
+            'st_uid': root_stat.st_uid,
+        }
 
     def _get_path(self, path):
         orig_path = path
@@ -151,3 +192,7 @@ class LegitFS(LoggingMixIn, Operations):
     def read(self, path, size, offset, fh):
         node = self._get_node(path)
         return node.read(size, offset, fh)
+
+    def readlink(self, path):
+        node = self._get_node(path)
+        return node.readlink()
