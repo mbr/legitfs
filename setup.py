@@ -21,7 +21,7 @@ setup(name='legitfs',
       url='http://github.com/mbr/legitfs',
       license='MIT',
       packages=find_packages(exclude=['tests']),
-      install_requires=['dulwich', 'fusepy', 'click'],
+      install_requires=['dulwich', 'fusepy', 'click', 'logbook'],
       entry_points={
           'console_scripts': [
               'legitfs = legitfs.cli:main',
