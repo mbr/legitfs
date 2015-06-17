@@ -12,7 +12,7 @@ def read(fname):
 
 setup(name='legitfs',
       version='0.3dev',
-      description='A read-only FUSE-based filesystem allowing you to browse '\
+      description='A read-only FUSE-based filesystem allowing you to browse '
                   'git repositories',
       long_description=read('README.rst'),
       keywords='git,fuse,filesystem,fs,read-only,readonly,legit,legitfs',
