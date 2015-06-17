@@ -2,9 +2,9 @@
 # coding=utf8
 
 import os
-import sys
 
 from setuptools import setup, find_packages
+
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -20,7 +20,11 @@ setup(name='legitfs',
       author_email='git@marcbrinkmann.de',
       url='http://github.com/mbr/legitfs',
       license='MIT',
-      scripts=['legitfs'],
       packages=find_packages(exclude=['tests']),
-      install_requires=['dulwich', 'fusepy'],
-     )
+      install_requires=['dulwich', 'fusepy', 'click'],
+      entry_points={
+          'console_scripts': [
+              'legitfs = legitfs.cli:main',
+          ]
+      }
+      )
