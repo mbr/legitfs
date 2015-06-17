@@ -2,18 +2,18 @@ import os
 
 
 def split_using(predicate, iterable):
-    it = iter(iterable)
+    values = [i for i in iterable]
 
-    top = []
-    for cur in it:
-        top.append(cur)
-        if predicate(cur):
+    for idx, v in enumerate(values):
+        if predicate(v):
             break
+    else:
+        raise ValueError('Not value satisfies predicate')
 
-    return top, [i for i in it]
+    return values[:idx+1], values[idx+1:]
 
 
-def translate_path(path):
+def split_git(path):
     """Translates a path into repository/repo_path components.
 
     All paths will be considered relative, regardless of whether or not they
@@ -21,10 +21,17 @@ def translate_path(path):
 
     :return: (leading_path, repo_path)
     """
-    if path.startswith('/'):
-        path = path[1:]
 
-    return tuple(
-        os.path.join(*c) if c else '' for c in
-        split_using(lambda v: v.endswith('.git'), path.split(os.sep))
-    )
+    # cleanup trailing slashes
+    path = path.rstrip(os.sep)
+
+    if not path:
+        return '/', None
+
+    try:
+        return tuple(
+            os.sep.join(c) if c else '' for c in
+            split_using(lambda v: v.endswith('.git'), path.split(os.sep))
+        )
+    except ValueError:
+        return path, None
