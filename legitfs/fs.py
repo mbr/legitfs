@@ -1,5 +1,5 @@
 from errno import ENOENT
-from stat import S_IFLNK
+from stat import S_IFLNK, S_IFDIR
 import os
 
 from fuse import FuseOSError, Operations, LoggingMixIn
@@ -72,11 +72,12 @@ class RepoMixin(object):
         except NotGitRepository:
             raise FuseOSError(ENOENT)
 
-        self.refs = self.repo.refs.keys()
 
-    def _get_refs(self, prefix='refs/'):
-        return {r[len(prefix):].split('/', 1)[0] for r in self.refs
-                if r.startswith(prefix)}
+class VDirMixin(object):
+    def getattr(self):
+        st = self.fs.empty_stat.copy()
+        st['st_mode'] |= S_IFDIR
+        return st
 
 
 class RepoNode(RepoMixin, VNode):
@@ -88,14 +89,17 @@ class RepoNode(RepoMixin, VNode):
     def readdir(self):
         entries = ['.', '..']
 
-        if 'HEAD' in self.refs:
+        if 'HEAD' in self.repo.refs:
             entries.append('HEAD')
 
         for fn in ('config', 'description'):
             if os.path.exists(os.path.join(self.lead, fn)):
                 entries.append(fn)
 
-        entries.extend(self._get_refs())
+        entries.extend([
+            'refs',
+            'objects',
+        ])
 
         return entries
 
@@ -107,11 +111,38 @@ class RepoNode(RepoMixin, VNode):
         if sub in cls.PLAIN_FILES:
             return FileNode(fs, lead, sub)
 
-        if (sub == 'HEAD' or sub == 'stash' or sub.startswith('heads') or
-                sub.startswith('remotes') or sub.startswith('tags')):
+        if sub == 'HEAD':
             return RefNode(fs, lead, sub)
 
+        if sub == 'objects':
+            pass
+
+        if sub.startswith('refs/') or sub == 'refs':
+            refs_node = RefsNode(fs, lead, sub)
+            if refs_node.is_endpoint:
+                return RefNode(fs, lead, sub)
+            return refs_node
+
         raise FuseOSError(ENOENT)
+
+
+class RefsNode(RepoMixin, VDirMixin, VNode):
+    def readdir(self):
+        entries = ['.', '..']
+
+        prefix = self.sub + '/'
+        valid_refs = set()
+        for ref in self.repo.refs.keys():
+            if not ref.startswith(prefix):
+                continue
+            valid_refs.add(ref[len(prefix):].split('/', 1)[0])
+
+        entries.extend(valid_refs)
+        return entries
+
+    @property
+    def is_endpoint(self):
+        return self.sub in self.repo.refs.keys()
 
 
 class RefNode(RepoMixin, VNode):
@@ -124,13 +155,7 @@ class RefNode(RepoMixin, VNode):
         return st
 
     def readlink(self):
-        if self.sub == 'HEAD':
             return 'objects/' + self.resolve_ref(self.sub)
-
-        if self.sub == 'stash':
-            return 'objects/' + self.resolve_ref('refs/stash')
-
-        return '/what/the/?'
 
 
 class FileNode(VNode):
