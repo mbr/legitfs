@@ -1,3 +1,7 @@
+.. note:: Due to deprecation of the underlying library, legitfs is currently
+          broken and being rewritten. You can still get the old stable version
+          (0.2) from PyPI
+
 leGit-fs
 ========
 
