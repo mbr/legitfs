@@ -1,4 +1,5 @@
 from collections import Counter
+from itertools import count
 from errno import ENOENT, EROFS
 import os
 from stat import S_IFLNK, S_IFDIR, S_IFREG
@@ -25,18 +26,12 @@ class DesciptorManager(object):
         self.refcount = Counter()
         self.data_hash = {}
         self.lock = RLock()
+        self.fd = count()
 
     def get_free_fd(self, h):
-        fd = 3
-
-        with self.lock:
-            while True:
-                if self.refcount[fd] == 0:
-                    self.refcount[fd] += 1
-                    self.data_hash[fd] = h
-                    return fd
-
-                fd += 1
+        fd = self.fd.next()
+        self.data_hash[fd] = h
+        return fd
 
     def get_hash(self, fd):
         return self.data_hash[fd]
