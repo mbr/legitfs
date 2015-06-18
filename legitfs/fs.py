@@ -1,6 +1,8 @@
-from errno import ENOENT
-from stat import S_IFLNK, S_IFDIR
+from collections import Counter
+from errno import ENOENT, EROFS
 import os
+from stat import S_IFLNK, S_IFDIR, S_IFREG
+from threading import RLock
 
 from fuse import FuseOSError, Operations, LoggingMixIn
 from dulwich.repo import Repo, NotGitRepository
@@ -16,6 +18,37 @@ def _stat_to_dict(st):
     return dict((key, getattr(st, key)) for key in
                 ('st_atime', 'st_ctime', 'st_gid', 'st_mode', 'st_mtime',
                  'st_nlink', 'st_size', 'st_uid'))
+
+
+class DesciptorManager(object):
+    def __init__(self):
+        self.refcount = Counter()
+        self.data_hash = {}
+        self.lock = RLock()
+
+    def get_free_fd(self, h):
+        fd = 3
+
+        with self.lock:
+            while True:
+                if self.refcount[fd] == 0:
+                    self.refcount[fd] += 1
+                    self.data_hash[fd] = h
+                    return fd
+
+                fd += 1
+
+    def get_hash(self, fd):
+        return self.data_hash[fd]
+
+    def release(self, fd):
+        with self.lock:
+            newval = max(self.refcount[fd] - 1, 0)
+            self.refcount[fd] = newval
+            if newval == 0:
+                del self.data_hash[fd]
+
+            return newval != 0
 
 
 class VNode(object):
@@ -114,8 +147,13 @@ class RepoNode(RepoMixin, VNode):
         if sub == 'HEAD':
             return RefNode(fs, lead, sub)
 
-        if sub == 'objects':
-            pass
+        if sub == 'objects' or sub.startswith('objects'):
+            objects_node = ObjectsNode(fs, lead, sub)
+
+            if sub == 'objects':
+                return objects_node
+
+            return objects_node.get_obj_node()
 
         if sub.startswith('refs/') or sub == 'refs':
             refs_node = RefsNode(fs, lead, sub)
@@ -124,6 +162,74 @@ class RepoNode(RepoMixin, VNode):
             return refs_node
 
         raise FuseOSError(ENOENT)
+
+
+class ObjectsNode(RepoMixin, VDirMixin, VNode):
+    def readdir(self):
+        entries = ['.', '..']
+
+        entries.extend(iter(self.repo.object_store))
+
+        return entries
+
+    def get_obj_node(self):
+        h = bytes(self.sub[self.sub.index('/')+1:])
+        obj = self.repo[h]
+
+        # determine type
+        if obj.type_name == 'commit':
+            return CommitNode(self.repo, obj, self.fs, self.lead, self.sub)
+        elif obj.type_name == 'tree':
+            return TreeNode(self.repo, obj, self.fs, self.lead, self.sub)
+        elif obj.type_name == 'blob':
+            return BlobNode(self.repo, obj, self.fs, self.lead, self.sub)
+
+        raise FuseOSError(ENOENT)
+
+
+class ObjectNode(RepoMixin, VNode):
+    def __init__(self, repo, obj, fs, lead, sub):
+        # not calling parent constructor, already have repo
+        VNode.__init__(self, fs, lead, sub)
+        self.repo = repo
+        self.obj = obj
+
+
+class CommitNode(VDirMixin, ObjectNode):
+    pass
+
+
+class TreeNode(VDirMixin, ObjectNode):
+    pass
+
+
+class BlobNode(VDirMixin, ObjectNode):
+    def getattr(self):
+        st = self.fs.empty_stat.copy()
+        st['st_mode'] = S_IFREG
+        st['st_size'] = self.obj.raw_length()
+        return st
+
+    def open(self, flags):
+        with self.fs.data_lock:
+            fd = self.fs.fd_man.get_free_fd(self.obj.id)
+
+            # load data into data_cache
+            if not self.obj.id in self.fs.data_cache:
+                self.fs.data_cache[self.obj.id] = self.obj.as_raw_string()
+
+            return fd
+
+    def read(self, size, offset, fh):
+        # lookup hash associated with filehandle
+        h = self.fs.fd_man.get_hash(fh)
+
+        # retrieve cached data for filehandle
+        data = self.fs.data_cache[h]
+
+        return data[offset:offset+size]
+
+    #def release(self, )
 
 
 class RefsNode(RepoMixin, VDirMixin, VNode):
@@ -174,6 +280,7 @@ class FileNode(VNode):
     def getattr(self):
         return _stat_to_dict(os.lstat(self.path))
 
+    # file i/o. rather slow, because we reopen the file each time
     def read(self, size, offset, fh):
         with open(self.path, 'rb') as f:
             f.seek(offset, 0)
@@ -197,6 +304,10 @@ class LegitFS(LoggingMixIn, Operations):
             'st_size': 0,
             'st_uid': root_stat.st_uid,
         }
+
+        self.data_cache = {}
+        self.data_lock = RLock()
+        self.fd_man = DesciptorManager()
 
     def _get_path(self, path):
         orig_path = path
@@ -225,10 +336,19 @@ class LegitFS(LoggingMixIn, Operations):
         node = self._get_node(path)
         return node.getattr()
 
-    # file i/o. rather slow, because we reopen the file each time
+    def open(self, path, flags):
+        if flags & (os.O_WRONLY | os.O_RDWR):
+            raise FuseOSError(EROFS)
+
+        node = self._get_node(path)
+        return node.open(flags)
+
     def read(self, path, size, offset, fh):
         node = self._get_node(path)
         return node.read(size, offset, fh)
+
+    def flush(self, *args):
+        import pdb; pdb.set_trace()  # DEBUG-REMOVEME
 
     def readlink(self, path):
         node = self._get_node(path)
