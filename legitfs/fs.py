@@ -168,13 +168,33 @@ class ObjectsNode(RepoMixin, VDirMixin, VNode):
         return entries
 
     def get_obj_node(self):
-        h = bytes(self.sub[self.sub.index('/')+1:])
+        parts = self.sub.split('/')
+        h = bytes(parts[1])
         obj = self.repo[h]
 
         # determine type
         if obj.type_name == 'commit':
             return CommitNode(self.repo, obj, self.fs, self.lead, self.sub)
         elif obj.type_name == 'tree':
+            # we got the root tree, now fetch subtree:
+
+            fn = '/'.join(parts[2:])
+
+            if fn:
+                try:
+                    dest_md, dest_sha = obj.lookup_path(
+                        self.repo.__getitem__, fn
+                    )
+                    dest_obj = self.repo[dest_sha]
+                except KeyError:
+                    raise FuseOSError(ENOENT)
+
+                if dest_obj.type_name == 'tree':
+                    obj = dest_obj
+                else:
+                    return BlobNode(self.repo, dest_obj, self.fs, self.lead,
+                                    self.sub)
+
             return TreeNode(self.repo, obj, self.fs, self.lead, self.sub)
         elif obj.type_name == 'blob':
             return BlobNode(self.repo, obj, self.fs, self.lead, self.sub)
@@ -195,7 +215,13 @@ class CommitNode(VDirMixin, ObjectNode):
 
 
 class TreeNode(VDirMixin, ObjectNode):
-    pass
+    def readdir(self):
+        entries = ['.', '..']
+
+        for e in self.obj.iteritems():
+            entries.append(e.path)
+
+        return entries
 
 
 class BlobNode(VDirMixin, ObjectNode):
