@@ -345,6 +345,7 @@ class RefNode(RepoMixin, VNode):
 
     def readlink(self):
         refname = self.sub
+        root = '../' * refname.count('/')
 
         target = self.repo.refs.read_ref(refname)
 
@@ -353,11 +354,9 @@ class RefNode(RepoMixin, VNode):
 
         if target.startswith(self.REFLINK_PREFIX):
             # symbolic ref
-            p = '../' * refname.count('/')
+            return root + target[len(self.REFLINK_PREFIX):]
 
-            return p + target[len(self.REFLINK_PREFIX):]
-
-        return 'objects/' + target
+        return root + 'objects/' + target
 
 
 class FileNode(VNode):
