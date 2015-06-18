@@ -211,7 +211,64 @@ class ObjectNode(RepoMixin, VNode):
 
 
 class CommitNode(VDirMixin, ObjectNode):
-    pass
+    def get_csub(self):
+        parts = self.sub.split('/')
+        root = '../' * (len(parts)-1)
+
+        return root, '/'.join(parts[2:])
+
+    def readdir(self):
+        _, csub = self.get_csub()
+
+        entries = ['.', '..']
+
+        if not csub:
+            entries.append('tree')
+
+            if self.obj.parents:
+                entries.append('parents')
+                entries.append('parent')
+
+        elif csub == 'parents':
+            for i in range(len(self.obj.parents)):
+                entries.append('{:02d}'.format(i))
+        else:
+            raise FuseOSError(ENOENT)
+
+        return entries
+
+    def getattr(self):
+        _, csub = self.get_csub()
+        if not csub:
+            return super(CommitNode, self).getattr()
+
+        st = self.fs.empty_stat.copy()
+
+        if csub == 'tree':
+            st['st_mode'] |= S_IFLNK
+        elif csub == 'parent':
+            st['st_mode'] |= S_IFLNK
+        elif csub == 'parents':
+            st['st_mode'] |= S_IFDIR
+        elif csub.startswith('parents/'):
+            st['st_mode'] |= S_IFLNK
+        else:
+            raise FuseOSError(ENOENT)
+
+        return st
+
+    def readlink(self):
+        root, csub = self.get_csub()
+
+        if csub == 'tree':
+            return root + 'objects/' + self.obj.tree
+        elif csub == 'parent':
+            return 'parents/00'
+        elif csub.startswith('parents/'):
+            idx = int(csub.split('/', 1)[1])
+            return root + '/objects/' + self.obj.parents[idx]
+
+        raise FuseOSError(ENOENT)
 
 
 class TreeNode(VDirMixin, ObjectNode):
