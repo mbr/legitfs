@@ -1,135 +1,73 @@
-.. note:: Due to deprecation of the underlying library, legitfs is currently
-          broken and being rewritten. You can still get the old stable version
-          (0.2) from PyPI
+legitfs
+=======
 
-leGit-fs
-========
-
-legit is a `FUSE <http://fuse.sourceforge.net/>`_-filesystem that mount git
+legit [1]_ is a `FUSE <http://fuse.sourceforge.net/>`_-filesystem that mounts git
 repositories read only, allowing direct access to commits, tags and branches
-through the filesystem.
+through the filesystem. This allows you to browse old versions from inside your
+favorite editor, provided it doesn't produce a mess by trying to read the whole
+tree...
 
 legitfs is read-only and won't eat your data.
 
+.. [1] le git filesystem is a is a legit file system!
 
-Installation (from PyPI)
-------------------------
 
-Assuming you have `virtualenvwrapper
-<http://www.doughellmann.com/projects/virtualenvwrapper/>`_ installed:
+Installation
+------------
 
-::
+legitfs is available from PyPi::
 
-  $ mkvirtualenv legitfs
   $ pip install legitfs
 
-
-Installation (without PyPI)
----------------------------
-
-legit requires the `FUSE python bindings
-<http://sourceforge.net/apps/mediawiki/fuse/index.php?title=FusePython>`_,
-usually these are available (and most often already installed) through your
-distro. The correct package on PyPI is named `fuse-python
-<http://pypi.python.org/pypi/fuse-python/>`_.
-
-In addition, a somewhat recent version of `dulwich
-<http://www.samba.org/~jelmer/dulwich/>`_ is required. Install it through your
-distro or via `PyPI <http://pypi.python.org/pypi/dulwich/>`_.
-
-The program itself is just a single file. Download it to anywhere in your path
-and run it.
+It uses fusepy_ which in turn means you need to have fuse development libraries
+and a C compiler installed. All other dependencies can work Python-only.
 
 
-Usage example
+Example usage
 -------------
 
-Let's try it! In an empty directory, type:
+Try this in an empty directory after installing legitfs:
 
 ::
 
   $ git clone git://github.com/mbr/simplekv.git
   $ git clone git://github.com/mitsuhiko/flask.git
 
-That will clone two git repositories for us to play around with. Now create a
-mountpoint somewhere
+Create a mountpoint and mount the current directory:
 
 ::
 
-  $ mkdir /tmp/legitfs-test
+  $ mkdir _history
+  $ legitfs _history
 
-Finally, we mount the current directory (and therefore its git repositories):
+legitfs will run in the foreground (you can unmount with ``C-c``), so we can
+continue in another terminal::
 
-::
-
-  $ legitfs -o root=./ /tmp/legitfs-test
-
-Done! Now let's see what we've got:
-
-::
-
-  $ ls /tmp/legitfs-test/
+  $ cd _history/
+  $ ls
   flask  simplekv
+  $ ls flask/.git/
+  $ ls flask/.git/refs/heads/master
+  $ ls flask/.git/refs/heads/master/tree
+  artwork  CONTRIBUTING.rst  flask     MANIFEST.in  setup.cfg  tox.ini
+  AUTHORS  docs              LICENSE   README       setup.py
+  CHANGES  examples          Makefile  scripts      tests
 
 ``legitfs`` tries to recreate the directory-structure and also handles nested
 repositories or those that are in subdirectories. Of course, you can also mount
 just one repository at the root.
 
-Some more interesting stuff:
+Objects are exposed in the ``objects/`` subdirectory, almost everything else is
+a symbolic link::
 
-::
+  $ cd flask/.git
+  $ ls refs/tags
+  0.1  0.10  0.10.1  0.2  0.3  0.3.1  0.4  0.5  0.6  0.6.1  0.7  0.7.1  0.7.2
+  0.8  0.8.1  0.9
+  $ ls refs/tags/0.7/tree
+  ...
+  $ head refs/tags/0.7/tree/README  -n 5
 
-  $ ls /tmp/legitfs-test/flask/
-  commits  HEAD  refs
-  $ ls /tmp/legitfs-test/flask/refs/tags -l
-  total 48
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.1 -> ../../commits/8605cc310d260c3b08160881b09da26c2cc95f8d
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.2 -> ../../commits/e0fa5aec3a13d9c3e8e27b53526fcee56ac0298d
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.3 -> ../../commits/ce6e4cbd73d57cb8c1bba85c46490f71061f865f
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.3.1 -> ../../commits/6b3e616cf905fd19c37fca93d1198cad1490567b
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.4 -> ../../commits/1592c53a664c82d9badac81fa0104af226cce5a7
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.5 -> ../../commits/4c937be2524de0fddc2d2f7f39b09677497260aa
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.6 -> ../../commits/5cadd9d34da46b909f91a5379d41b90f258d5998
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.6.1 -> ../../commits/774b7f768214f5b0c125a1b80daa97247a0ac1a6
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.7 -> ../../commits/fb1482d3bb1b95803d25247479eb8ca8317a3219
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.7.1 -> ../../commits/9682d6b371d8c1ce1fd0e58424e836d27d2317b3
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.7.2 -> ../../commits/3f5db33ece48bd22b77fcc62553998ea9a6cfdfc
-  lrwxrwxrwx. 1 root root 4096  1. Jan 1970  0.8 -> ../../commits/d5e10e4685f54dde5ffc27c4f55a19fb23f7a536
+                        // Flask //
 
-Each repository contains at least three files: ``commits`` contains
-directories, one for each commit, allowing you to access commits. ``HEAD`` is
-the current ``HEAD``-ref and is, like all refs, a symlink. ``refs`` also works
-as you would expect and is full of symlinks.
-
-Another feature are relative refs:
-
-::
-
-  $ head -n5 /tmp/legitfs-test/flask/refs/tags/0.7~15/README
-
-                            // Flask //
-
-                web development, one drop at a time
-
-Notice the '0.7~15', which is git-speak for "tag 0.7, then go 15 revisions
-back". While these virtual "files" aren't shown when you ``ls`` the
-``refs/tags`` directory, you can append any number of ``~n`` or ``^`` to any
-ref to go back commits.
-
-
-What's missing
---------------
-
-* Optimizations for when the tree needs to be rebuilt.
-
-* Submodules. I currently don't use any and haven't tried them at all.
-
-* Currently, each file is read into memory completely (since I haven't been
-  able to find a streaming-api for blobs in dulwich yet), so working on large
-  files might not be feasible at the moment. Unless you have a lot of RAM.
-
-
-Is it legit?
-------------
-
-Completely.
+            web development, one drop at a time
