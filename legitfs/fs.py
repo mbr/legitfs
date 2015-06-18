@@ -224,7 +224,13 @@ class BlobNode(VDirMixin, ObjectNode):
 
         return data[offset:offset+size]
 
-    #def release(self, )
+    def release(self, fh):
+        with self.fs.data_lock:
+            h = self.fs.fd_man.get_hash(fh)
+
+            del self.fs.data_cache[h]
+
+        return 0
 
 
 class RefsNode(RepoMixin, VDirMixin, VNode):
@@ -342,8 +348,11 @@ class LegitFS(LoggingMixIn, Operations):
         node = self._get_node(path)
         return node.read(size, offset, fh)
 
-    def flush(self, *args):
-        import pdb; pdb.set_trace()  # DEBUG-REMOVEME
+    def release(self, path, fh):
+        # note: for some reason, this isn't called?
+        # flush is though...
+        node = self._get_node(path)
+        return node.release(fh)
 
     def readlink(self, path):
         node = self._get_node(path)
