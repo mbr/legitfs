@@ -1,15 +1,13 @@
 legitfs
 =======
 
-legit [1]_ is a `FUSE <http://fuse.sourceforge.net/>`_-filesystem that mounts git
+legit is a `FUSE <http://fuse.sourceforge.net/>`_-filesystem that mounts git
 repositories read only, allowing direct access to commits, tags and branches
 through the filesystem. This allows you to browse old versions from inside your
 favorite editor, provided it doesn't produce a mess by trying to read the whole
 tree...
 
 legitfs is read-only and won't eat your data.
-
-.. [1] le git filesystem is a is a legit file system!
 
 
 Installation
