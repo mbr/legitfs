@@ -30,7 +30,7 @@ class DesciptorManager(object):
         self.fd = count()
 
     def get_free_fd(self, h):
-        fd = self.fd.next()
+        fd = next(self.fd)
         self.data_hash[fd] = h
         return fd
 
@@ -49,6 +49,11 @@ class DesciptorManager(object):
 
 class VNode(object):
     def __init__(self, fs, lead, sub):
+        # checks introduced with Python3 migration; dulwich and git internally
+        # use bytestrings, while fs operations are done in unicode in regular
+        # python
+        assert isinstance(lead, str)
+        assert isinstance(sub, (str, type(None)))
         self.fs = fs
         self.lead = lead
         self.sub = sub
@@ -96,6 +101,10 @@ class DirNode(VNode):
 class RepoMixin(object):
     def __init__(self, fs, lead, sub):
         super(RepoMixin, self).__init__(fs, lead, sub)
+
+        assert isinstance(lead, str)
+        assert isinstance(sub, (str, type(None)))
+
         try:
             self.repo = Repo(lead)
         except NotGitRepository:
@@ -118,7 +127,7 @@ class RepoNode(RepoMixin, VNode):
     def readdir(self):
         entries = ['.', '..']
 
-        if 'HEAD' in self.repo.refs:
+        if b'HEAD' in self.repo.refs:
             entries.append('HEAD')
 
         for fn in ('config', 'description'):
@@ -131,6 +140,9 @@ class RepoNode(RepoMixin, VNode):
 
     @classmethod
     def load(cls, fs, lead, sub):
+        assert isinstance(lead, str)
+        assert isinstance(sub, (str, type(None)))
+
         log_prefix = format('load node lead={} sub={} :=> '.format(lead, sub))
         if not sub:
             log.debug(log_prefix + 'root node')
@@ -145,7 +157,7 @@ class RepoNode(RepoMixin, VNode):
             return RefNode(fs, lead, sub)
 
         if sub == 'objects' or sub.startswith('objects'):
-            log.debug('node is object')
+            log.debug('node is objects')
             objects_node = ObjectsNode(fs, lead, sub)
 
             if sub == 'objects':
@@ -168,22 +180,22 @@ class ObjectsNode(RepoMixin, VDirMixin, VNode):
     def readdir(self):
         entries = ['.', '..']
 
-        entries.extend(iter(self.repo.object_store))
+        entries.extend(o.decode(GIT_FS_CHARSET)
+                       for o in iter(self.repo.object_store))
 
         return entries
 
     def get_obj_node(self):
         parts = self.sub.split('/')
-        h = bytes(parts[1])
+        h = bytes(parts[1].encode(GIT_FS_CHARSET))
         obj = self.repo[h]
 
         # determine type
-        if obj.type_name == 'commit':
+        if obj.type_name == b'commit':
             return CommitNode(self.repo, obj, self.fs, self.lead, self.sub)
-        elif obj.type_name == 'tree':
+        elif obj.type_name == b'tree':
             # we got the root tree, now fetch subtree:
-
-            fn = '/'.join(parts[2:])
+            fn = '/'.join(parts[2:]).encode(GIT_FS_CHARSET)
 
             if fn:
                 try:
@@ -200,7 +212,7 @@ class ObjectsNode(RepoMixin, VDirMixin, VNode):
                                     self.sub)
 
             return TreeNode(self.repo, obj, self.fs, self.lead, self.sub)
-        elif obj.type_name == 'blob':
+        elif obj.type_name == b'blob':
             return BlobNode(self.repo, obj, self.fs, self.lead, self.sub)
 
         raise FuseOSError(ENOENT)
@@ -208,6 +220,9 @@ class ObjectsNode(RepoMixin, VDirMixin, VNode):
 
 class ObjectNode(RepoMixin, VNode):
     def __init__(self, repo, obj, fs, lead, sub):
+        assert isinstance(lead, str)
+        assert isinstance(sub, (str, type(None)))
+
         # not calling parent constructor, already have repo
         VNode.__init__(self, fs, lead, sub)
         self.repo = repo
@@ -280,7 +295,7 @@ class TreeNode(VDirMixin, ObjectNode):
         entries = ['.', '..']
 
         for e in self.obj.iteritems():
-            entries.append(e.path)
+            entries.append(e.path.decode(GIT_FS_CHARSET))
 
         return entries
 
@@ -324,21 +339,21 @@ class RefsNode(RepoMixin, VDirMixin, VNode):
     def readdir(self):
         entries = ['.', '..']
 
-        prefix = self.sub + '/'
+        prefix = (self.sub + '/').encode(GIT_FS_CHARSET)
         valid_refs = set()
 
         for ref in self.repo.refs.keys():
-            ref = ref.decode(GIT_FS_CHARSET)
             if not ref.startswith(prefix):
                 continue
-            valid_refs.add(ref[len(prefix):].split('/', 1)[0])
+            valid_refs.add(ref[len(prefix):].split(b'/', 1)[0].decode(
+                GIT_FS_CHARSET))
 
         entries.extend(valid_refs)
         return entries
 
     @property
     def is_endpoint(self):
-        return self.sub in self.repo.refs.keys()
+        return self.sub.encode(GIT_FS_CHARSET) in self.repo.refs.keys()
 
 
 class RefNode(RepoMixin, VNode):
@@ -350,10 +365,11 @@ class RefNode(RepoMixin, VNode):
         return st
 
     def readlink(self):
+        log.debug('READLINK called: {!r}'.format(self.sub))
         refname = self.sub
         root = '../' * refname.count('/')
 
-        target = self.repo.refs.read_ref(refname)
+        target = self.repo.refs.read_ref(refname).decode(GIT_FS_CHARSET)
 
         if target is None:
             raise FuseOSError(ENOENT)
