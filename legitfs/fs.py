@@ -13,6 +13,8 @@ from .util import split_git
 
 log = Logger('fs')
 
+GIT_FS_CHARSET = 'utf8'
+
 
 def _stat_to_dict(st):
     return dict((key, getattr(st, key))
@@ -129,16 +131,21 @@ class RepoNode(RepoMixin, VNode):
 
     @classmethod
     def load(cls, fs, lead, sub):
+        log_prefix = format('load node lead={} sub={} :=> '.format(lead, sub))
         if not sub:
+            log.debug(log_prefix + 'root node')
             return cls(fs, lead, sub)
 
         if sub in cls.PLAIN_FILES:
+            log.debug(log_prefix + 'node is plain file')
             return FileNode(fs, lead, sub)
 
         if sub == 'HEAD':
+            log.debug(log_prefix + 'node is HEAD')
             return RefNode(fs, lead, sub)
 
         if sub == 'objects' or sub.startswith('objects'):
+            log.debug('node is object')
             objects_node = ObjectsNode(fs, lead, sub)
 
             if sub == 'objects':
@@ -147,11 +154,13 @@ class RepoNode(RepoMixin, VNode):
             return objects_node.get_obj_node()
 
         if sub.startswith('refs/') or sub == 'refs':
+            log.debug(log_prefix + 'node is ref')
             refs_node = RefsNode(fs, lead, sub)
             if refs_node.is_endpoint:
                 return RefNode(fs, lead, sub)
             return refs_node
 
+        log.debug('node is unknown')
         raise FuseOSError(ENOENT)
 
 
@@ -317,7 +326,9 @@ class RefsNode(RepoMixin, VDirMixin, VNode):
 
         prefix = self.sub + '/'
         valid_refs = set()
+
         for ref in self.repo.refs.keys():
+            ref = ref.decode(GIT_FS_CHARSET)
             if not ref.startswith(prefix):
                 continue
             valid_refs.add(ref[len(prefix):].split('/', 1)[0])
