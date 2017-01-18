@@ -280,12 +280,13 @@ class CommitNode(VDirMixin, ObjectNode):
         root, csub = self.get_csub()
 
         if csub == 'tree':
-            return root + 'objects/' + self.obj.tree
+            return root + 'objects/' + self.obj.tree.decode(GIT_FS_CHARSET)
         elif csub == 'parent':
             return 'parents/00'
         elif csub.startswith('parents/'):
             idx = int(csub.split('/', 1)[1])
-            return root + '/objects/' + self.obj.parents[idx]
+            return root + '/objects/' + self.obj.parents[idx].decode(
+                GIT_FS_CHARSET)
 
         raise FuseOSError(ENOENT)
 
