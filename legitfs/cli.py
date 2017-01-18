@@ -27,8 +27,14 @@ log = Logger('cli')
               default=False,
               is_flag=True,
               help='Enable debug output', )
-def main(mountpoint, root, debug):
-    redirect_logging()
+@click.option('--fuse-debug',
+              '-D',
+              default=False,
+              is_flag=True,
+              help='When debug is enabled, also log fuse message')
+def main(mountpoint, root, debug, fuse_debug):
+    if fuse_debug:
+        redirect_logging()
 
     # setup logging
     StderrHandler(level=DEBUG if debug else INFO).push_application()
