@@ -11,14 +11,13 @@ from logbook import Logger
 
 from .util import split_git
 
-
 log = Logger('fs')
 
 
 def _stat_to_dict(st):
-    return dict((key, getattr(st, key)) for key in
-                ('st_atime', 'st_ctime', 'st_gid', 'st_mode', 'st_mtime',
-                 'st_nlink', 'st_size', 'st_uid'))
+    return dict((key, getattr(st, key))
+                for key in ('st_atime', 'st_ctime', 'st_gid', 'st_mode',
+                            'st_mtime', 'st_nlink', 'st_size', 'st_uid'))
 
 
 class DesciptorManager(object):
@@ -124,10 +123,7 @@ class RepoNode(RepoMixin, VNode):
             if os.path.exists(os.path.join(self.lead, fn)):
                 entries.append(fn)
 
-        entries.extend([
-            'refs',
-            'objects',
-        ])
+        entries.extend(['refs', 'objects', ])
 
         return entries
 
@@ -182,9 +178,8 @@ class ObjectsNode(RepoMixin, VDirMixin, VNode):
 
             if fn:
                 try:
-                    dest_md, dest_sha = obj.lookup_path(
-                        self.repo.__getitem__, fn
-                    )
+                    dest_md, dest_sha = obj.lookup_path(self.repo.__getitem__,
+                                                        fn)
                     dest_obj = self.repo[dest_sha]
                 except KeyError:
                     raise FuseOSError(ENOENT)
@@ -213,7 +208,7 @@ class ObjectNode(RepoMixin, VNode):
 class CommitNode(VDirMixin, ObjectNode):
     def get_csub(self):
         parts = self.sub.split('/')
-        root = '../' * (len(parts)-1)
+        root = '../' * (len(parts) - 1)
 
         return root, '/'.join(parts[2:])
 
@@ -305,7 +300,7 @@ class BlobNode(VDirMixin, ObjectNode):
         # retrieve cached data for filehandle
         data = self.fs.data_cache[h]
 
-        return data[offset:offset+size]
+        return data[offset:offset + size]
 
     def release(self, fh):
         with self.fs.data_lock:

@@ -10,7 +10,7 @@ def split_using(predicate, iterable):
     else:
         raise ValueError('Not value satisfies predicate')
 
-    return values[:idx+1], values[idx+1:]
+    return values[:idx + 1], values[idx + 1:]
 
 
 def split_git(path):
@@ -29,9 +29,8 @@ def split_git(path):
         return '/', None
 
     try:
-        return tuple(
-            os.sep.join(c) if c else '' for c in
-            split_using(lambda v: v.endswith('.git'), path.split(os.sep))
-        )
+        return tuple(os.sep.join(c) if c else ''
+                     for c in split_using(lambda v: v.endswith('.git'),
+                                          path.split(os.sep)))
     except ValueError:
         return path, None
