@@ -12,8 +12,8 @@ def read(fname):
 
 setup(name='legitfs',
       version='0.4.dev1',
-      description='A read-only FUSE-based filesystem allowing you to browse '
-                  'git repositories',
+      description=('A read-only FUSE-based filesystem allowing you to browse '
+                   'git repositories'),
       long_description=read('README.rst'),
       keywords='git,fuse,filesystem,fs,read-only,readonly,legit,legitfs',
       author='Marc Brinkmann',
@@ -26,5 +26,4 @@ setup(name='legitfs',
           'console_scripts': [
               'legitfs = legitfs.cli:main',
           ]
-      }
-      )
+      })
