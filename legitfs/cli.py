@@ -10,17 +10,18 @@ from .fs import LegitFS
 log = Logger('cli')
 
 
-@click.command()
+@click.command(help='Mount a git repository with history at MOUNTPOINT')
 @click.argument(
     'mountpoint',
     type=click.Path(file_okay=False,
-                    dir_okay=True, exists=True))
+                    dir_okay=True, exists=True), )
 @click.option(
     '--root',
     '-r',
     default='.',
     type=click.Path(file_okay=False,
-                    dir_okay=True, exists=True), )
+                    dir_okay=True, exists=True),
+    help='Path to the git repository that is to be mounted at mountpoint', )
 @click.option('--debug',
               '-d',
               default=False,
