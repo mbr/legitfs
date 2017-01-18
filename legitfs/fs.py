@@ -376,7 +376,7 @@ class LegitFS(LoggingMixIn, Operations):
             'st_atime': 0,
             'st_ctime': 0,
             'st_gid': root_stat.st_gid,
-            'st_mode': 0644,
+            'st_mode': 0o644,
             'st_mtime': 0,
             'st_nlink': 1,
             'st_size': 0,
@@ -395,7 +395,7 @@ class LegitFS(LoggingMixIn, Operations):
         rv = split_git(os.path.join(self.root, path))
 
         # for debugging
-        print log.debug('{} => {}'.format(orig_path, rv))
+        log.debug(log.debug('{} => {}'.format(orig_path, rv)))
         return rv
 
     def _get_node(self, path):
