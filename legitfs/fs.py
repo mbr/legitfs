@@ -456,7 +456,7 @@ class LegitFS(LoggingMixIn, Operations):
         node = self._get_node(path)
         return node.getattr()
 
-    def open(self, path, flags):
+    def open(self, path, flags=0):
         if flags & (os.O_WRONLY | os.O_RDWR):
             raise FuseOSError(EROFS)
 
