@@ -383,14 +383,27 @@ class RefNode(RepoMixin, VNode):
 
 
 class FileNode(VNode):
+    def release(self, fh):
+        with self.fs.data_lock:
+            fd = self.fs.passthrough_man.get_hash(fh)
+            fd.close()
+            self.fs.passthrough_man.release(fh)
+
     def getattr(self):
         return _stat_to_dict(os.lstat(self.path))
 
-    # file i/o. rather slow, because we reopen the file each time
     def read(self, size, offset, fh):
-        with open(self.path, 'rb') as f:
-            f.seek(offset, 0)
-            return f.read(size)
+        fp = self.fs.passthrough_man.get_hash(fh)
+
+        fp.seek(offset, 0)
+        return fp.read(size)
+
+    def open(self, flags):
+        fp = open(self.path, 'rb')
+        with self.fs.data_lock:
+            fd = self.fs.passthrough_man.get_free_fd(fp)
+
+            return fd
 
 
 class LegitFS(LoggingMixIn, Operations):
@@ -414,6 +427,7 @@ class LegitFS(LoggingMixIn, Operations):
         self.data_cache = {}
         self.data_lock = RLock()
         self.fd_man = DescriptorManager()
+        self.passthrough_man = DescriptorManager()
 
     def _get_path(self, path):
         orig_path = path
