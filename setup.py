@@ -11,7 +11,7 @@ def read(fname):
 
 
 setup(name='legitfs',
-      version='0.4.0.dev0',
+      version='0.4.1.dev1',
       description=('A read-only FUSE-based filesystem allowing you to browse '
                    'git repositories'),
       long_description=read('README.rst'),
