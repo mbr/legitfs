@@ -313,7 +313,7 @@ class BlobNode(VDirMixin, ObjectNode):
             fd = self.fs.fd_man.get_free_fd(self.obj.id)
 
             # load data into data_cache
-            if not self.obj.id in self.fs.data_cache:
+            if self.obj.id not in self.fs.data_cache:
                 self.fs.data_cache[self.obj.id] = self.obj.as_raw_string()
 
             return fd
