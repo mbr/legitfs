@@ -22,7 +22,7 @@ def _stat_to_dict(st):
                             'st_mtime', 'st_nlink', 'st_size', 'st_uid'))
 
 
-class DesciptorManager(object):
+class DescriptorManager(object):
     def __init__(self):
         self.refcount = Counter()
         self.data_hash = {}
@@ -413,7 +413,7 @@ class LegitFS(LoggingMixIn, Operations):
 
         self.data_cache = {}
         self.data_lock = RLock()
-        self.fd_man = DesciptorManager()
+        self.fd_man = DescriptorManager()
 
     def _get_path(self, path):
         orig_path = path
