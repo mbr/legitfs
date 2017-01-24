@@ -9,6 +9,10 @@ tree...
 
 legitfs is read-only and won't eat your data.
 
+legitfs 0.3 is the last version written for Python 2. legitfs 0.4 and onwards
+are Python 3 only (they may run on 2.7, but are not tested on anything below
+3.3).
+
 
 Installation
 ------------
