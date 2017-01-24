@@ -245,9 +245,17 @@ class CommitNode(VDirMixin, ObjectNode):
             entries.append('tree')
 
             if self.obj.parents:
+                entries.append('history')
                 entries.append('parents')
                 entries.append('parent')
+        elif csub == 'history':
+            idx = 0
+            cur = self.obj.parents
 
+            while cur:
+                entries.append('{:06d}_{}'.format(idx, cur[0].decode('ascii')))
+                cur = self.repo[cur[0]].parents
+                idx += 1
         elif csub == 'parents':
             for i in range(len(self.obj.parents)):
                 entries.append('{:02d}'.format(i))
@@ -265,10 +273,14 @@ class CommitNode(VDirMixin, ObjectNode):
 
         if csub == 'tree':
             st['st_mode'] |= S_IFLNK
+        elif csub == 'history':
+            st['st_mode'] |= S_IFDIR
         elif csub == 'parent':
             st['st_mode'] |= S_IFLNK
         elif csub == 'parents':
             st['st_mode'] |= S_IFDIR
+        elif csub.startswith('history/'):
+            st['st_mode'] |= S_IFLNK
         elif csub.startswith('parents/'):
             st['st_mode'] |= S_IFLNK
         else:
@@ -285,8 +297,11 @@ class CommitNode(VDirMixin, ObjectNode):
             return 'parents/00'
         elif csub.startswith('parents/'):
             idx = int(csub.split('/', 1)[1])
-            return root + '/objects/' + self.obj.parents[idx].decode(
+            return root + 'objects/' + self.obj.parents[idx].decode(
                 GIT_FS_CHARSET)
+        elif csub.startswith('history/'):
+            h = csub.rsplit('_', 1)[1]
+            return root + 'objects/' + h
 
         raise FuseOSError(ENOENT)
 
